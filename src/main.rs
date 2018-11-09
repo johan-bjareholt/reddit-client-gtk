@@ -113,6 +113,22 @@ fn replace_view_with(builder: &gtk::Builder, view: &gtk::Box) {
     view.show();
 }
 
+fn set_loadingspinner(status: bool) -> () {
+    let ctx = glib::MainContext::default();
+    ctx.invoke(move || {
+        let sg = get_state();
+        let s = sg.lock().unwrap();
+
+        let spinner : gtk::Spinner = s.builder.get_object("LoadingSpinner").unwrap();
+
+        if status {
+            spinner.start();
+        } else {
+            spinner.stop();
+        }
+    });
+}
+
 fn statechange_loop (rx: Receiver<ViewChangeCommand>) {
     thread::spawn(move || {
         let ctx = glib::MainContext::default();
@@ -121,6 +137,7 @@ fn statechange_loop (rx: Receiver<ViewChangeCommand>) {
                 Ok(c) => c,
                 Err(_e) => continue
             };
+            set_loadingspinner(true);
             match new_view {
                 ViewChangeCommand::SubredditView(subreddit_name) => {
                     println!("Switching to subreddit view {}", subreddit_name);
@@ -145,6 +162,7 @@ fn statechange_loop (rx: Receiver<ViewChangeCommand>) {
                     });
                 }
             }
+            set_loadingspinner(false);
         }
     });
 }
