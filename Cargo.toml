@@ -5,7 +5,7 @@ authors = ["Johan Bjäreholt <johan@bjareho.lt>"]
 edition = "2018"
 
 [dependencies]
-redditor = { path = "../redditor" }
+redditor = { git = "https://github.com/johan-bjareholt/redditor.git" }
 webkit2gtk = "0.5"
 glib = "0.6"
 

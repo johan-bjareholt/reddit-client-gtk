@@ -93,10 +93,21 @@ fn create_link_widget(post: &Post, show_comments_btn: bool, show_body: bool) -> 
     entry_info.pack_start(&label, false, false, 0);
 
     let permalink = post.permalink();
-    let permalink_url = format!("https://www.reddit.com{}", permalink);
     let linkurl = post.url();
-    println!("{}", permalink_url);
-    println!("{}", linkurl);
+
+    let permalink_comment = permalink.clone();
+    if show_comments_btn {
+        let commentsbtn = gtk::Button::new_with_label("Comments");
+        commentsbtn.connect_clicked(move |_b| {
+            let sg = get_state();
+            let s = sg.lock().unwrap();
+            s.state_tx.send(ViewChangeCommand::CommentsView(String::from(permalink_comment.clone()))).unwrap();
+        });
+        entry_info.pack_end(&commentsbtn, false, false, 0);
+    }
+
+    // If permalink_url and linkurl are the same it is a selfpost, no linkbtn is needed
+    let permalink_url = format!("https://www.reddit.com{}", permalink);
     if permalink_url != linkurl {
         let linkbtn = gtk::Button::new_with_label("Link");
         linkbtn.connect_clicked(move |_b| {
@@ -105,16 +116,6 @@ fn create_link_widget(post: &Post, show_comments_btn: bool, show_body: bool) -> 
             s.state_tx.send(ViewChangeCommand::WebView(linkurl.clone())).unwrap();
         });
         entry_info.pack_end(&linkbtn, false, false, 5);
-    }
-
-    if show_comments_btn {
-        let commentsbtn = gtk::Button::new_with_label("Comments");
-        commentsbtn.connect_clicked(move |_b| {
-            let sg = get_state();
-            let s = sg.lock().unwrap();
-            s.state_tx.send(ViewChangeCommand::CommentsView(String::from(permalink.clone()))).unwrap();
-        });
-        entry_info.pack_end(&commentsbtn, false, false, 0);
     }
 
     entry.pack_start(&entry_info, false, false, 0);
