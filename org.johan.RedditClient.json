@@ -1,0 +1,27 @@
+{
+    "app-id": "org.johan.RedditClient",
+    "runtime": "org.gnome.Platform",
+    "runtime-version": "3.30",
+    "sdk": "org.gnome.Sdk",
+    "finish-args": [
+        "--socket=x11",
+        "--socket=wayland",
+        "--share=network"
+    ],
+    "command": "reddit-client",
+    "modules": [
+        {
+            "name": "reddit-client",
+            "buildsystem": "simple",
+            "build-commands": [
+                "install -D reddit-client-gtk-rs /app/bin/reddit-client"
+            ],
+            "sources": [
+                {
+                    "type": "file",
+                    "path": "target/debug/reddit-client-gtk-rs"
+                }
+            ]
+        }
+    ]
+}

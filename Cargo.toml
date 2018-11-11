@@ -5,9 +5,9 @@ authors = ["Johan Bjäreholt <johan@bjareho.lt>"]
 edition = "2018"
 
 [dependencies]
-rawr = { git = "https://github.com/johan-bjareholt/rawr.git" }
-glib = "0.6.0"
+redditor = { path = "../redditor" }
+glib = "0.6"
 
 [dependencies.gtk]
-version = "0.5.0"
+version = "0.5"
 features = ["v3_22"]

@@ -1,29 +1,27 @@
 extern crate glib;
 extern crate gtk;
-extern crate rawr;
+extern crate redditor;
 
 use gtk::prelude::*;
-use rawr::prelude::*;
 
 use std::thread;
+use std::collections::LinkedList;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::mpsc::{channel, Sender, Receiver};
 
-use rawr::client::RedditClient;
-use rawr::auth::AnonymousAuthenticator;
-use rawr::options::ListingOptions;
-use rawr::structures::submission::Submission;
-use rawr::structures::subreddit::Subreddit;
+use redditor::Client;
+use redditor::types::{Listing, Post, CommentList, Comment};
 
+#[derive(Clone,Debug)]
 pub enum ViewChangeCommand {
     SubredditView(String),
-    CommentsView(String)
+    CommentsView(String),
+    PreviousView(),
 }
 
 pub struct State {
     builder: gtk::Builder,
-    client: RedditClient,
     state_tx: Sender<ViewChangeCommand>
 }
 
@@ -38,53 +36,68 @@ pub fn get_state() -> Arc<Mutex<State>> {
     }
 }
 
-fn create_comments_container(post: Submission) -> gtk::Box {
+fn create_comments_container_loop(comment: &Comment) -> gtk::Box {
+    static PADDING : i32 = 5;
+    let root_container: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, PADDING);
+
+    let comment_container: gtk::Box = gtk::Box::new(gtk::Orientation::Horizontal, PADDING);
+    let rlabel = gtk::Label::new(None);
+    rlabel.set_line_wrap(true);
+    let label_str = format!("<small>{} - u/{}</small>\n{}", comment.score(), comment.author(), comment.body());
+    rlabel.set_markup(&label_str);
+    comment_container.pack_start(&rlabel, false, false, 0);
+
+    let reply_container_root: gtk::Box = gtk::Box::new(gtk::Orientation::Horizontal, PADDING);
+    let reply_container_separator = gtk::Separator::new(gtk::Orientation::Horizontal);
+    reply_container_root.pack_start(&reply_container_separator, false, false, 10);
+    let reply_container: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, PADDING);
+    reply_container_root.pack_start(&reply_container, false, false, 0);
+    for reply in comment.replies() {
+        let reply_container_v = create_comments_container_loop(reply);
+        reply_container.pack_start(&reply_container_v, false, false, 0);
+    }
+
+    root_container.pack_start(&comment_container, false, false, 0);
+    root_container.pack_start(&reply_container_root, false, false, 0);
+    return root_container
+}
+
+fn create_comments_container(commentlist: CommentList) -> gtk::Box {
+    let post = commentlist.post();
     let container : gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let plabel = gtk::Label::new(None);
-    let plabel_str = format!("{} - {}\n<small>r/{}, {} comments</small>", post.score(), post.title(), post.subreddit().name, post.reply_count());
+    let plabel_str = format!("{} - {}\n<small>r/{}, {} comments</small>", post.score(), post.title(), post.subreddit(), post.num_comments());
     plabel.set_markup(&plabel_str);
     plabel.set_line_wrap(true);
     container.pack_start(&plabel, false, false, 0);
 
-    let replies = post.replies().expect("Could not get comments");
     let comments_container = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    for comment in replies.take(10) {
-        let comment_container: gtk::Box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        let rlabel = gtk::Label::new(None);
-        rlabel.set_line_wrap(true);
-        let author = "u/username"; // TODO: Fix username
-        let label_str = format!("<small>{} - {}</small>\n{}", comment.score(), author, comment.body().unwrap());
-        rlabel.set_markup(&label_str);
-
-        comment_container.pack_start(&rlabel, false, false, 0);
+    for comment in commentlist.comments() {
+        let comment_container = create_comments_container_loop(comment);
         comments_container.pack_start(&comment_container, false, false, 0);
     }
-    let separator = gtk::Separator::new(gtk::Orientation::Horizontal);
-    container.pack_end(&separator, false, false, 0);
     container.pack_end(&comments_container, false, false, 0);
 
     container.show_all();
     return container
 }
 
-fn create_link_container(subreddit: Subreddit) -> gtk::Box {
+fn create_link_container(posts: Listing<Post>) -> gtk::Box {
     let container : gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, 0);
 
-    let listing = subreddit.hot(ListingOptions::default()).expect("Could not fetch posts");
-
-    for post in listing.take(5) {
+    for post in posts {
         let entry = gtk::Box::new(gtk::Orientation::Horizontal, 0);
 
         let label = gtk::Label::new(None);
 
-        let label_str = format!("{} - {}\n<small>r/{}, {} comments</small>", post.score(), post.title(), post.subreddit().name, post.reply_count());
+        let label_str = format!("{} - {}\n<small>r/{}, {} comments</small>", post.score(), post.title(), post.subreddit(), post.num_comments());
         label.set_markup(&label_str);
         label.set_line_wrap(true);
         entry.pack_start(&label, false, false, 0);
 
         let linkbtn = gtk::Button::new_with_label("Link");
         entry.pack_end(&linkbtn, false, false, 5);
-        let submission_id = post.name().to_string();
+        let submission_id = post.permalink().to_string();
 
         let commentsbtn = gtk::Button::new_with_label("Comments");
         commentsbtn.connect_clicked(move |_b| {
@@ -129,40 +142,59 @@ fn set_loadingspinner(status: bool) -> () {
     });
 }
 
-fn statechange_loop (rx: Receiver<ViewChangeCommand>) {
+fn statechange_loop (rx: Receiver<ViewChangeCommand>, tx: Sender<ViewChangeCommand>) {
     thread::spawn(move || {
+        let mut client = Client::new();
         let ctx = glib::MainContext::default();
+        let mut prev_view_stack : LinkedList<ViewChangeCommand> = LinkedList::new();
         loop {
+            set_loadingspinner(false);
             let new_view = match rx.recv() {
                 Ok(c) => c,
                 Err(_e) => continue
             };
             set_loadingspinner(true);
-            match new_view {
+            match new_view.clone() {
                 ViewChangeCommand::SubredditView(subreddit_name) => {
                     println!("Switching to subreddit view {}", subreddit_name);
+                    let posts = client.get_subreddit_posts(&subreddit_name);
+
                     ctx.invoke(move || {
                         let sg = get_state();
                         let s = sg.lock().unwrap();
-
-                        let frontpage = s.client.subreddit(&subreddit_name);
-                        let frontpage_view = create_link_container(frontpage);
+                        let frontpage_view = create_link_container(posts);
                         replace_view_with(&s.builder, &frontpage_view);
                     });
                 },
                 ViewChangeCommand::CommentsView(post_id) => {
                     println!("Switching to comments view with id: {}", post_id);
+                    let commentlist = client.get_comments(&post_id).unwrap();
                     ctx.invoke(move || {
                         let sg = get_state();
                         let s = sg.lock().unwrap();
-
-                        let post = s.client.get_by_id(&post_id).get().unwrap();
-                        let comments_view = create_comments_container(post);
+                        let comments_view = create_comments_container(commentlist);
                         replace_view_with(&s.builder, &comments_view);
                     });
+                },
+                ViewChangeCommand::PreviousView() => {
+                    if prev_view_stack.len() <= 1 {
+                        continue
+                    }
+                    let _current_view = prev_view_stack.pop_front();
+                    let prev_view = prev_view_stack.pop_front();
+                    match prev_view {
+                        None => (),
+                        Some(prev_view) => {
+                            println!("Going back to previous view: {:?}", prev_view);
+                            tx.send(prev_view).unwrap();
+                        }
+                    }
                 }
             }
-            set_loadingspinner(false);
+            match new_view {
+                ViewChangeCommand::PreviousView() => (),
+                new_view => prev_view_stack.push_front(new_view)
+            }
         }
     });
 }
@@ -186,11 +218,21 @@ fn main() {
     });
 
     // Setup popover
-    let button: gtk::Button = builder.get_object("PreferencesPopoverButton").unwrap();
+    let button : gtk::Button = builder.get_object("PreferencesPopoverButton").unwrap();
     let popover : gtk::PopoverMenu = builder.get_object("PreferencesPopoverMenu").unwrap();
     button.connect_clicked(move |_| {
         println!("Showing popover");
         popover.popup();
+    });
+
+    let back_button : gtk::Button = builder.get_object("BackButton").unwrap();
+    let backbutton_tx = tx.clone();
+    back_button.connect_clicked(move |_| {
+        println!("Pressed back button");
+        match backbutton_tx.send(ViewChangeCommand::PreviousView()) {
+            Ok(_) => (),
+            Err(_) => ()
+        }
     });
 
     // Setup subreddit selection
@@ -204,17 +246,14 @@ fn main() {
 
     window.show_all();
 
-    let client = RedditClient::new("linux:reddit-client-gtk-rs:0.0.0", AnonymousAuthenticator::new());
-
     unsafe {
         STATE = Some(Arc::new(Mutex::new(State {
             builder: builder,
-            client: client,
             state_tx: tx.clone()
         })));
     }
 
-    statechange_loop(rx);
+    statechange_loop(rx, tx.clone());
     tx.send(ViewChangeCommand::SubredditView(String::from("all"))).unwrap();
     // Load frontpage by default
 
