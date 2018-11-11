@@ -1,8 +1,10 @@
 extern crate glib;
 extern crate gtk;
+extern crate webkit2gtk;
 extern crate redditor;
 
 use gtk::prelude::*;
+use webkit2gtk::WebViewExt;
 
 use std::thread;
 use std::collections::LinkedList;
@@ -17,6 +19,7 @@ use redditor::types::{Listing, Post, CommentList, Comment};
 pub enum ViewChangeCommand {
     SubredditView(String),
     CommentsView(String),
+    WebView(String),
     PreviousView(),
 }
 
@@ -38,7 +41,7 @@ pub fn get_state() -> Arc<Mutex<State>> {
 
 fn create_comments_container_loop(comment: &Comment) -> gtk::Box {
     static PADDING : i32 = 5;
-    let root_container: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, PADDING);
+    let root_container: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, PADDING*2);
 
     let comment_container: gtk::Box = gtk::Box::new(gtk::Orientation::Horizontal, PADDING);
     let rlabel = gtk::Label::new(None);
@@ -49,7 +52,7 @@ fn create_comments_container_loop(comment: &Comment) -> gtk::Box {
 
     let reply_container_root: gtk::Box = gtk::Box::new(gtk::Orientation::Horizontal, PADDING);
     let reply_container_separator = gtk::Separator::new(gtk::Orientation::Horizontal);
-    reply_container_root.pack_start(&reply_container_separator, false, false, 10);
+    reply_container_root.pack_start(&reply_container_separator, false, false, 0);
     let reply_container: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, PADDING);
     reply_container_root.pack_start(&reply_container, false, false, 0);
     for reply in comment.replies() {
@@ -65,11 +68,8 @@ fn create_comments_container_loop(comment: &Comment) -> gtk::Box {
 fn create_comments_container(commentlist: CommentList) -> gtk::Box {
     let post = commentlist.post();
     let container : gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    let plabel = gtk::Label::new(None);
-    let plabel_str = format!("{} - {}\n<small>r/{}, {} comments</small>", post.score(), post.title(), post.subreddit(), post.num_comments());
-    plabel.set_markup(&plabel_str);
-    plabel.set_line_wrap(true);
-    container.pack_start(&plabel, false, false, 0);
+    let post_container = create_link_widget(&post, false, true);
+    container.pack_start(&post_container, false, false, 0);
 
     let comments_container = gtk::Box::new(gtk::Orientation::Vertical, 0);
     for comment in commentlist.comments() {
@@ -78,34 +78,63 @@ fn create_comments_container(commentlist: CommentList) -> gtk::Box {
     }
     container.pack_end(&comments_container, false, false, 0);
 
-    container.show_all();
     return container
+}
+
+fn create_link_widget(post: &Post, show_comments_btn: bool, show_body: bool) -> gtk::Box {
+    let entry = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let entry_info = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+
+    let label = gtk::Label::new(None);
+
+    let label_str = format!("{} - {}\n<small>r/{}, {} comments</small>", post.score(), post.title(), post.subreddit(), post.num_comments());
+    label.set_markup(&label_str);
+    label.set_line_wrap(true);
+    entry_info.pack_start(&label, false, false, 0);
+
+    let permalink = post.permalink();
+    let permalink_url = format!("https://www.reddit.com{}", permalink);
+    let linkurl = post.url();
+    println!("{}", permalink_url);
+    println!("{}", linkurl);
+    if permalink_url != linkurl {
+        let linkbtn = gtk::Button::new_with_label("Link");
+        linkbtn.connect_clicked(move |_b| {
+            let sg = get_state();
+            let s = sg.lock().unwrap();
+            s.state_tx.send(ViewChangeCommand::WebView(linkurl.clone())).unwrap();
+        });
+        entry_info.pack_end(&linkbtn, false, false, 5);
+    }
+
+    if show_comments_btn {
+        let commentsbtn = gtk::Button::new_with_label("Comments");
+        commentsbtn.connect_clicked(move |_b| {
+            let sg = get_state();
+            let s = sg.lock().unwrap();
+            s.state_tx.send(ViewChangeCommand::CommentsView(String::from(permalink.clone()))).unwrap();
+        });
+        entry_info.pack_end(&commentsbtn, false, false, 0);
+    }
+
+    entry.pack_start(&entry_info, false, false, 0);
+
+    if show_body {
+        let body_label = gtk::Label::new(None);
+        let label_str = format!("{}", post.body());
+        body_label.set_markup(&label_str);
+        body_label.set_line_wrap(true);
+        entry.pack_start(&body_label, false, false, 0);
+    }
+
+    return entry;
 }
 
 fn create_link_container(posts: Listing<Post>) -> gtk::Box {
     let container : gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, 0);
 
     for post in posts {
-        let entry = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-
-        let label = gtk::Label::new(None);
-
-        let label_str = format!("{} - {}\n<small>r/{}, {} comments</small>", post.score(), post.title(), post.subreddit(), post.num_comments());
-        label.set_markup(&label_str);
-        label.set_line_wrap(true);
-        entry.pack_start(&label, false, false, 0);
-
-        let linkbtn = gtk::Button::new_with_label("Link");
-        entry.pack_end(&linkbtn, false, false, 5);
-        let submission_id = post.permalink().to_string();
-
-        let commentsbtn = gtk::Button::new_with_label("Comments");
-        commentsbtn.connect_clicked(move |_b| {
-            let sg = get_state();
-            let s = sg.lock().unwrap();
-            s.state_tx.send(ViewChangeCommand::CommentsView(String::from(submission_id.clone()))).unwrap();
-        });
-        entry.pack_end(&commentsbtn, false, false, 0);
+        let entry = create_link_widget(&post, true, false);
 
         let separator = gtk::Separator::new(gtk::Orientation::Horizontal);
 
@@ -113,17 +142,16 @@ fn create_link_container(posts: Listing<Post>) -> gtk::Box {
         container.pack_start(&entry, false, false, 0);
     }
 
-    container.show_all();
     return container;
 }
 
-fn replace_view_with(builder: &gtk::Builder, view: &gtk::Box) {
+fn replace_view_with(builder: &gtk::Builder, view: &gtk::Widget) {
     let root_container: gtk::Container = builder.get_object("ContentViewport").unwrap();
     for child in root_container.get_children() {
         root_container.remove(&child);
     }
     root_container.add(view);
-    view.show();
+    view.show_all();
 }
 
 fn set_loadingspinner(status: bool) -> () {
@@ -163,7 +191,7 @@ fn statechange_loop (rx: Receiver<ViewChangeCommand>, tx: Sender<ViewChangeComma
                         let sg = get_state();
                         let s = sg.lock().unwrap();
                         let frontpage_view = create_link_container(posts);
-                        replace_view_with(&s.builder, &frontpage_view);
+                        replace_view_with(&s.builder, &frontpage_view.upcast::<gtk::Widget>());
                     });
                 },
                 ViewChangeCommand::CommentsView(post_id) => {
@@ -173,9 +201,19 @@ fn statechange_loop (rx: Receiver<ViewChangeCommand>, tx: Sender<ViewChangeComma
                         let sg = get_state();
                         let s = sg.lock().unwrap();
                         let comments_view = create_comments_container(commentlist);
-                        replace_view_with(&s.builder, &comments_view);
+                        replace_view_with(&s.builder, &comments_view.upcast::<gtk::Widget>());
                     });
                 },
+                ViewChangeCommand::WebView(url) => {
+                    ctx.invoke(move || {
+                        let sg = get_state();
+                        let s = sg.lock().unwrap();
+
+                        let webview = webkit2gtk::WebView::new();
+                        webview.load_uri(&url);
+                        replace_view_with(&s.builder, &webview.upcast::<gtk::Widget>());
+                    });
+                }
                 ViewChangeCommand::PreviousView() => {
                     if prev_view_stack.len() <= 1 {
                         continue
@@ -216,6 +254,7 @@ fn main() {
     window.connect_destroy(|_| {
         gtk::main_quit();
     });
+    window.show_all();
 
     // Setup popover
     let button : gtk::Button = builder.get_object("PreferencesPopoverButton").unwrap();
@@ -243,8 +282,6 @@ fn main() {
         tx2.send(ViewChangeCommand::SubredditView(String::from(subreddit_name))).unwrap();
         entry.set_buffer(&gtk::EntryBuffer::new(None));
     });
-
-    window.show_all();
 
     unsafe {
         STATE = Some(Arc::new(Mutex::new(State {

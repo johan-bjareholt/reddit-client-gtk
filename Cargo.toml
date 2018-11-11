@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 redditor = { path = "../redditor" }
+webkit2gtk = "0.5"
 glib = "0.6"
 
 [dependencies.gtk]
