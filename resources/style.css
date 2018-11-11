@@ -1,0 +1,18 @@
+.comment-box-0 {
+    border-image: none;
+    background-image: none;
+    background-color: blue;
+    border: 3px solid blue;
+}
+.comment-box-1 {
+    border-image: none;
+    background-image: none;
+    background-color: green;
+    border: 3px solid green;
+}
+.comment-box-2 {
+    border-image: none;
+    background-image: none;
+    background-color: #c00;
+    border: 3px solid #c00;
+}

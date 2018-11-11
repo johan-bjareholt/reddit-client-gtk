@@ -1,5 +1,6 @@
 extern crate glib;
 extern crate gtk;
+extern crate gdk;
 extern crate webkit2gtk;
 extern crate redditor;
 
@@ -39,29 +40,38 @@ pub fn get_state() -> Arc<Mutex<State>> {
     }
 }
 
-fn create_comments_container_loop(comment: &Comment) -> gtk::Box {
+fn create_comments_container_loop(comment: &Comment, depth: u8) -> gtk::Box {
     static PADDING : i32 = 5;
     let root_container: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, PADDING*2);
 
     let comment_container: gtk::Box = gtk::Box::new(gtk::Orientation::Horizontal, PADDING);
     let rlabel = gtk::Label::new(None);
+    rlabel.set_selectable(true);
     rlabel.set_line_wrap(true);
     let label_str = format!("<small>{} - u/{}</small>\n{}", comment.score(), comment.author(), comment.body());
     rlabel.set_markup(&label_str);
     comment_container.pack_start(&rlabel, false, false, 0);
+    root_container.pack_start(&comment_container, false, false, 0);
 
-    let reply_container_root: gtk::Box = gtk::Box::new(gtk::Orientation::Horizontal, PADDING);
-    let reply_container_separator = gtk::Separator::new(gtk::Orientation::Horizontal);
-    reply_container_root.pack_start(&reply_container_separator, false, false, 0);
-    let reply_container: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, PADDING);
-    reply_container_root.pack_start(&reply_container, false, false, 0);
-    for reply in comment.replies() {
-        let reply_container_v = create_comments_container_loop(reply);
-        reply_container.pack_start(&reply_container_v, false, false, 0);
+    let replies = comment.replies();
+    if replies.len() > 0 {
+        let reply_container_root: gtk::Box = gtk::Box::new(gtk::Orientation::Horizontal, PADDING);
+
+        let reply_container_sep_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        let reply_container_sep_widget = reply_container_sep_box.upcast::<gtk::Widget>();
+        let sep_class_name = format!("comment-box-{}", depth % 3);
+        reply_container_sep_widget.get_style_context().unwrap().add_class(&sep_class_name);
+        reply_container_root.pack_start(&reply_container_sep_widget, false, false, 0);
+
+        let reply_container: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, PADDING);
+        reply_container_root.pack_start(&reply_container, false, false, 0);
+        for reply in comment.replies() {
+            let reply_container_v = create_comments_container_loop(reply, depth+1);
+            reply_container.pack_start(&reply_container_v, false, false, 0);
+        }
+        root_container.pack_start(&reply_container_root, false, false, 0);
     }
 
-    root_container.pack_start(&comment_container, false, false, 0);
-    root_container.pack_start(&reply_container_root, false, false, 0);
     return root_container
 }
 
@@ -73,7 +83,7 @@ fn create_comments_container(commentlist: CommentList) -> gtk::Box {
 
     let comments_container = gtk::Box::new(gtk::Orientation::Vertical, 0);
     for comment in commentlist.comments() {
-        let comment_container = create_comments_container_loop(comment);
+        let comment_container = create_comments_container_loop(comment, 0);
         comments_container.pack_start(&comment_container, false, false, 0);
     }
     container.pack_end(&comments_container, false, false, 0);
@@ -82,7 +92,8 @@ fn create_comments_container(commentlist: CommentList) -> gtk::Box {
 }
 
 fn create_link_widget(post: &Post, show_comments_btn: bool, show_body: bool) -> gtk::Box {
-    let entry = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    static PADDING : i32 = 25;
+    let entry = gtk::Box::new(gtk::Orientation::Vertical, PADDING);
     let entry_info = gtk::Box::new(gtk::Orientation::Horizontal, 0);
 
     let label = gtk::Label::new(None);
@@ -124,6 +135,7 @@ fn create_link_widget(post: &Post, show_comments_btn: bool, show_body: bool) -> 
         let body_label = gtk::Label::new(None);
         let label_str = format!("{}", post.body());
         body_label.set_markup(&label_str);
+        body_label.set_selectable(true);
         body_label.set_line_wrap(true);
         entry.pack_start(&body_label, false, false, 0);
     }
@@ -153,6 +165,12 @@ fn replace_view_with(builder: &gtk::Builder, view: &gtk::Widget) {
     }
     root_container.add(view);
     view.show_all();
+}
+
+fn set_headerbar_subtitle(builder: &gtk::Builder, new_subtitle: &str) {
+    let headerbar_widget : gtk::Container = builder.get_object("HeaderBar").unwrap();
+    let headerbar = headerbar_widget.downcast::<gtk::HeaderBar>().unwrap();
+    headerbar.set_subtitle(new_subtitle);
 }
 
 fn set_loadingspinner(status: bool) -> () {
@@ -192,7 +210,9 @@ fn statechange_loop (rx: Receiver<ViewChangeCommand>, tx: Sender<ViewChangeComma
                         let sg = get_state();
                         let s = sg.lock().unwrap();
                         let frontpage_view = create_link_container(posts);
+                        let new_subtitle = format!("r/{}", subreddit_name);
                         replace_view_with(&s.builder, &frontpage_view.upcast::<gtk::Widget>());
+                        set_headerbar_subtitle(&s.builder, &new_subtitle);
                     });
                 },
                 ViewChangeCommand::CommentsView(post_id) => {
@@ -201,8 +221,10 @@ fn statechange_loop (rx: Receiver<ViewChangeCommand>, tx: Sender<ViewChangeComma
                     ctx.invoke(move || {
                         let sg = get_state();
                         let s = sg.lock().unwrap();
+                        let new_subtitle = format!("r/{}", commentlist.post().subreddit());
                         let comments_view = create_comments_container(commentlist);
                         replace_view_with(&s.builder, &comments_view.upcast::<gtk::Widget>());
+                        set_headerbar_subtitle(&s.builder, &new_subtitle);
                     });
                 },
                 ViewChangeCommand::WebView(url) => {
@@ -256,6 +278,13 @@ fn main() {
         gtk::main_quit();
     });
     window.show_all();
+
+    // Setup css
+    let screen = gdk::Screen::get_default().unwrap();
+    let css_provider = gtk::CssProvider::new();
+    css_provider.load_from_data(include_bytes!("../resources/style.css")).unwrap();
+    static GTK_STYLE_PROVIDER_PRIORITY_APPLICATION : u32 = 600;
+    gtk::StyleContext::add_provider_for_screen(&screen, &css_provider, GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 
     // Setup popover
     let button : gtk::Button = builder.get_object("PreferencesPopoverButton").unwrap();

@@ -8,6 +8,7 @@ edition = "2018"
 redditor = { git = "https://github.com/johan-bjareholt/redditor.git" }
 webkit2gtk = "0.5"
 glib = "0.6"
+gdk = "0.9"
 
 [dependencies.gtk]
 version = "0.5"
