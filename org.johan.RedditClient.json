@@ -3,24 +3,40 @@
     "runtime": "org.gnome.Platform",
     "runtime-version": "3.30",
     "sdk": "org.gnome.Sdk",
+    "sdk-extensions" : [
+        "org.freedesktop.Sdk.Extension.rust-stable"
+    ],
     "finish-args": [
         "--socket=x11",
         "--socket=wayland",
         "--share=network",
         "--socket=pulseaudio"
     ],
+    "build-options" : {
+        "append-path" : "/usr/lib/sdk/rust-stable/bin",
+        "build-args" : [
+            "--share=network"
+        ],
+        "env" : {
+            "CARGO_HOME" : "/run/build/Fractal/cargo",
+            "RUST_BACKTRACE" : "1"
+        }
+    },
+
     "command": "reddit-client",
     "modules": [
         {
             "name": "reddit-client",
             "buildsystem": "simple",
+            "builddir": true,
             "build-commands": [
-                "install -D reddit-client-gtk-rs /app/bin/reddit-client"
+                "cargo build --release",
+                "install -D target/release/reddit-client-gtk-rs /app/bin/reddit-client"
             ],
             "sources": [
                 {
-                    "type": "file",
-                    "path": "target/debug/reddit-client-gtk-rs"
+                    "type": "git",
+                    "url": "https://github.com/johan-bjareholt/reddit-client-gtk"
                 }
             ]
         }

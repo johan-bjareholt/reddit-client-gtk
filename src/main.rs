@@ -45,13 +45,25 @@ fn create_comments_container_loop(comment: &Comment, depth: u8) -> gtk::Box {
     let root_container: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, PADDING*2);
 
     let comment_container: gtk::Box = gtk::Box::new(gtk::Orientation::Horizontal, PADDING);
-    let rlabel = gtk::Label::new(None);
-    rlabel.set_selectable(true);
-    rlabel.set_line_wrap(true);
-    let label_str = format!("<small>{} - u/{}</small>\n{}", comment.score(), comment.author(), comment.body());
-    rlabel.set_markup(&label_str);
-    comment_container.pack_start(&rlabel, false, false, 0);
-    root_container.pack_start(&comment_container, false, false, 0);
+    let comment_container2: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, PADDING);
+
+    let header_label = gtk::Label::new(None);
+    let header_label_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    let label_str = format!("<small>{} - u/{}</small>", comment.score(), comment.author());
+    header_label.set_markup(&label_str);
+
+    let body_label = gtk::Label::new(None);
+    let body_label_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    body_label.set_selectable(true);
+    body_label.set_line_wrap(true);
+    body_label.set_markup(&comment.body());
+
+    header_label_box.pack_start(&header_label, false, true, 0);
+    body_label_box.pack_start(&body_label, false, true, 0);
+    comment_container2.pack_start(&header_label_box, false, true, 0);
+    comment_container2.pack_start(&body_label_box, false, true, 0);
+    comment_container.pack_start(&comment_container2, false, true, 0);
+    root_container.pack_start(&comment_container, false, true, 0);
 
     let replies = comment.replies();
     if replies.len() > 0 {
@@ -60,16 +72,16 @@ fn create_comments_container_loop(comment: &Comment, depth: u8) -> gtk::Box {
         let reply_container_sep_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         let reply_container_sep_widget = reply_container_sep_box.upcast::<gtk::Widget>();
         let sep_class_name = format!("comment-box-{}", depth % 3);
-        reply_container_sep_widget.get_style_context().unwrap().add_class(&sep_class_name);
-        reply_container_root.pack_start(&reply_container_sep_widget, false, false, 0);
+        reply_container_sep_widget.get_style_context().add_class(&sep_class_name);
+        reply_container_root.pack_start(&reply_container_sep_widget, false, true, 0);
 
         let reply_container: gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, PADDING);
-        reply_container_root.pack_start(&reply_container, false, false, 0);
+        reply_container_root.pack_start(&reply_container, false, true, 0);
         for reply in comment.replies() {
             let reply_container_v = create_comments_container_loop(reply, depth+1);
-            reply_container.pack_start(&reply_container_v, false, false, 0);
+            reply_container.pack_start(&reply_container_v, false, true, 0);
         }
-        root_container.pack_start(&reply_container_root, false, false, 0);
+        root_container.pack_start(&reply_container_root, false, true, 0);
     }
 
     return root_container
@@ -79,42 +91,55 @@ fn create_comments_container(commentlist: CommentList) -> gtk::Box {
     let post = commentlist.post();
     let container : gtk::Box = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let post_container = create_link_widget(&post, false, true);
-    container.pack_start(&post_container, false, false, 0);
+    container.pack_start(&post_container, false, true, 0);
 
     let comments_container = gtk::Box::new(gtk::Orientation::Vertical, 0);
     for comment in commentlist.comments() {
         let comment_container = create_comments_container_loop(comment, 0);
-        comments_container.pack_start(&comment_container, false, false, 0);
+        comments_container.pack_start(&comment_container, false, true, 0);
     }
-    container.pack_end(&comments_container, false, false, 0);
+    container.pack_end(&comments_container, false, true, 0);
 
     return container
 }
 
 fn create_link_widget(post: &Post, show_comments_btn: bool, show_body: bool) -> gtk::Box {
-    static PADDING : i32 = 25;
-    let entry = gtk::Box::new(gtk::Orientation::Vertical, PADDING);
+    let entry = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let entry_info = gtk::Box::new(gtk::Orientation::Horizontal, 0);
 
-    let label = gtk::Label::new(None);
+    let points_label = gtk::Label::new(None);
+    let points_str = format!("{}", post.score());
+    points_label.set_markup(&points_str);
+    points_label.set_property_width_request(50);
+    entry_info.pack_start(&points_label, false, true, 5);
 
-    let label_str = format!("{} - {}\n<small>r/{}, {} comments</small>", post.score(), post.title(), post.subreddit(), post.num_comments());
-    label.set_markup(&label_str);
-    label.set_line_wrap(true);
-    entry_info.pack_start(&label, false, false, 0);
+    let bbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let title_label = gtk::Label::new(None);
+    let title_str = format!("{}\n<small>r/{}, {} comments</small>", post.title(), post.subreddit(), post.num_comments());
+    title_label.set_markup(&title_str);
+    title_label.set_xalign(0.0);
+    title_label.set_justify(gtk::Justification::Left);
+    title_label.set_line_wrap(true);
+    title_label.set_halign(gtk::Align::Start);
+    bbox.pack_start(&title_label, false, true, 0);
+
+    entry_info.pack_start(&bbox, true, true, 5);
 
     let permalink = post.permalink();
     let linkurl = post.url();
 
     let permalink_comment = permalink.clone();
     if show_comments_btn {
-        let commentsbtn = gtk::Button::new_with_label("Comments");
+        let image : gtk::Image = gtk::Image::new_from_file("./resources/chat-icon.png");
+        image.set_size_request(32, 32);
+        let commentsbtn = gtk::Button::new();
+        commentsbtn.set_image(Some(&image));
         commentsbtn.connect_clicked(move |_b| {
             let sg = get_state();
             let s = sg.lock().unwrap();
             s.state_tx.send(ViewChangeCommand::CommentsView(String::from(permalink_comment.clone()))).unwrap();
         });
-        entry_info.pack_end(&commentsbtn, false, false, 0);
+        entry_info.pack_end(&commentsbtn, false, true, 0);
     }
 
     // If permalink_url and linkurl are the same it is a selfpost, no linkbtn is needed
@@ -126,10 +151,10 @@ fn create_link_widget(post: &Post, show_comments_btn: bool, show_body: bool) -> 
             let s = sg.lock().unwrap();
             s.state_tx.send(ViewChangeCommand::WebView(linkurl.clone())).unwrap();
         });
-        entry_info.pack_end(&linkbtn, false, false, 5);
+        entry_info.pack_end(&linkbtn, false, true, 5);
     }
 
-    entry.pack_start(&entry_info, false, false, 0);
+    entry.pack_start(&entry_info, false, true, 0);
 
     if show_body {
         let body_label = gtk::Label::new(None);
@@ -137,7 +162,7 @@ fn create_link_widget(post: &Post, show_comments_btn: bool, show_body: bool) -> 
         body_label.set_markup(&label_str);
         body_label.set_selectable(true);
         body_label.set_line_wrap(true);
-        entry.pack_start(&body_label, false, false, 0);
+        entry.pack_start(&body_label, false, true, 0);
     }
 
     return entry;
@@ -151,8 +176,8 @@ fn create_link_container(posts: Listing<Post>) -> gtk::Box {
 
         let separator = gtk::Separator::new(gtk::Orientation::Horizontal);
 
-        container.pack_start(&separator, false, false, 1);
-        container.pack_start(&entry, false, false, 0);
+        container.pack_start(&separator, false, true, 1);
+        container.pack_start(&entry, false, true, 0);
     }
 
     return container;

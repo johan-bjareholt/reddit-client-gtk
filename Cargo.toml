@@ -6,10 +6,8 @@ edition = "2018"
 
 [dependencies]
 redditor = { git = "https://github.com/johan-bjareholt/redditor.git" }
-webkit2gtk = "0.5"
-glib = "0.6"
-gdk = "0.9"
-
-[dependencies.gtk]
-version = "0.5"
-features = ["v3_22"]
+#redditor = { path = "../redditor" }
+webkit2gtk = "0.6"
+glib = "0.7"
+gdk = "0.10"
+gtk = { version = "0.6", features = ["v3_22"] }
