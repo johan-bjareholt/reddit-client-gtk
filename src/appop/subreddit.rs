@@ -12,7 +12,7 @@ impl AppOp {
         let mut client = Client::new();
         let posts = client.get_subreddit_posts(&subreddit_name);
 
-        let subreddit_headerbar = self.create_subreddit_headerbar(subreddit_name.clone());
+        let subreddit_headerbar = self.create_subreddit_headerbar(&subreddit_name);
         let subreddit_view = self.create_subreddit_view(posts);
 
         self.update_headerbar(subreddit_headerbar);
@@ -44,14 +44,14 @@ impl AppOp {
         });
     }
 
-    fn create_subreddit_headerbar(&self, subreddit_name: String) -> gtk::Widget {
+    fn create_subreddit_headerbar(&self, subreddit_name: &String) -> gtk::Widget {
         let subreddit_headerbar: gtk::HeaderBar = self
             .ui
             .builder
             .get_object("subreddit_headerbar")
             .expect("Couldn't find subreddit_headerbar in ui file.");
 
-        subreddit_headerbar.set_subtitle(Some(&subreddit_name));
+        subreddit_headerbar.set_subtitle(Some(subreddit_name));
 
         subreddit_headerbar.upcast::<gtk::Widget>()
     }

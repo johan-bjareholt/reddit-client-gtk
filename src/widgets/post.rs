@@ -83,8 +83,9 @@ impl<'a> PostBox<'a> {
     fn connect_comments_btn(&self, comments_btn: &gtk::Button) {
         let url = self.post.permalink();
         let backend = self.op.backend.clone();
+        let subreddit_name = self.post.subreddit();
         comments_btn.connect_clicked(move |_| {
-            backend.clone().send(ViewChangeCommand::CommentsView(url.clone())).unwrap();
+            backend.clone().send(ViewChangeCommand::CommentsView(url.clone(), subreddit_name.clone())).unwrap();
         });
     }
 

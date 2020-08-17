@@ -7,8 +7,8 @@ use crate::appop::AppOp;
 
 impl AppOp {
     pub fn load_webview_view(&self, url: String) {        
-        let webview_headerbar = self.create_webview_headerbar(url.clone());
-        let webview_view = self.create_webview_view(url);
+        let webview_headerbar = self.create_webview_headerbar(&url);
+        let webview_view = self.create_webview_view(&url);
         
         self.update_headerbar(webview_headerbar);
         self.update_view(webview_view);
@@ -23,21 +23,21 @@ impl AppOp {
         });
     }
 
-    fn create_webview_headerbar(&self, url: String) -> gtk::Widget {
+    fn create_webview_headerbar(&self, url: &String) -> gtk::Widget {
         let webview_headerbar: gtk::HeaderBar = self
             .ui
             .builder
             .get_object("webview_headerbar")
             .expect("Couldn't find webview_headerbar in ui file.");
 
-        webview_headerbar.set_subtitle(Some(&url));
+        webview_headerbar.set_subtitle(Some(url));
 
         webview_headerbar.upcast::<gtk::Widget>()
     }
 
-    fn create_webview_view(&self, url: String) -> gtk::Widget {
+    fn create_webview_view(&self, url: &String) -> gtk::Widget {
         let webview = webkit2gtk::WebView::new();
-        webview.load_uri(&url);
+        webview.load_uri(url);
         webview.upcast::<gtk::Widget>()
     }
 }

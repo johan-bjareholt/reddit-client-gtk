@@ -1,6 +1,7 @@
 extern crate glib;
 extern crate gtk;
 extern crate gdk;
+extern crate pango;
 extern crate webkit2gtk;
 extern crate redditor;
 

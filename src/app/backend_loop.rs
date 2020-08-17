@@ -41,9 +41,9 @@ pub fn backend_loop (tx: Sender<ViewChangeCommand>, rx: Receiver<ViewChangeComma
                     println!("Switching to subreddit view {}", subreddit_name);
                     APPOP!(load_subreddit_view, (subreddit_name));
                 },
-                ViewChangeCommand::CommentsView(post_id) => {
+                ViewChangeCommand::CommentsView(post_id, subreddit_name) => {
                     println!("Switching to comments view with id: {}", post_id);
-                    APPOP!(load_comments_view, (post_id));
+                    APPOP!(load_comments_view, (post_id, subreddit_name));
                 },
                 ViewChangeCommand::WebView(url) => {
                     println!("Switching to web view with url: {}", url);
