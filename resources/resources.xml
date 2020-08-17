@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/org/johan/RedditClient/">
+    <file>css/app.css</file>
+    <file preprocess="xml-stripblanks">icons/chat-icon.svg</file>
+    <file preprocess="xml-stripblanks">icons/globe-icon.svg</file>
+    <file preprocess="xml-stripblanks">ui/main_window.ui</file>
+    <file preprocess="xml-stripblanks">ui/comments.ui</file>
+    <file preprocess="xml-stripblanks">ui/subreddit.ui</file>
+    <file preprocess="xml-stripblanks">ui/webview.ui</file>
+  </gresource>
+</gresources>

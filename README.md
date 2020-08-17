@@ -9,6 +9,6 @@ To compile and run simply do "cargo run"
 
 #### Special thanks to
 
-- The Fractal Project for
+- The RedditGtkClient Project for
     - their nicely written code to have as a reference
     - their chat icon which I reused

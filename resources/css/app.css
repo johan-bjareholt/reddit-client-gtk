@@ -1,0 +1,31 @@
+/* Comment */
+.comment-container {
+    border-top: 1px dotted #fff;
+}
+.comment-reply-0 {
+    background-color: #365189;
+    border: 2px solid #365189;
+}
+.comment-reply-1 {
+    background-color: #74ce75;
+    border: 2px solid #74ce75;
+}
+.comment-reply-2 {
+    background-color: #a96173;
+    border: 2px solid #a96173;
+}
+.comment-reply-3 {
+    background-color: #a561a9;
+    border: 2px solid #a561a9;
+}
+.comment-reply-4 {
+    background-color: #618ea9;
+    border: 2px solid #618ea9;
+}
+
+/* Post */
+.post-body {
+    border: 1px solid #888;
+    margin: 5px;
+    padding: 5px;
+}
