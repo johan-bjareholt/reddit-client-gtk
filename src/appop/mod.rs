@@ -67,7 +67,7 @@ impl AppOp {
         }
 
         headerbar_stack.add(&widget);
-        headerbar_stack.show_all();
+        headerbar_stack.show();
     }
 
     fn update_view(&self, widget: gtk::Widget) {
@@ -81,6 +81,6 @@ impl AppOp {
         }
 
         main_content_stack.add(&widget);
-        main_content_stack.show_all();
+        main_content_stack.show();
     }
 }

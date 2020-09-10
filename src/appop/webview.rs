@@ -31,6 +31,7 @@ impl AppOp {
             .expect("Couldn't find webview_headerbar in ui file.");
 
         webview_headerbar.set_subtitle(Some(url));
+        webview_headerbar.show_all();
 
         webview_headerbar.upcast::<gtk::Widget>()
     }
@@ -38,6 +39,8 @@ impl AppOp {
     fn create_webview_view(&self, url: &String) -> gtk::Widget {
         let webview = webkit2gtk::WebView::new();
         webview.load_uri(url);
+        webview.show_all();
+
         webview.upcast::<gtk::Widget>()
     }
 }

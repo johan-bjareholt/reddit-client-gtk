@@ -37,8 +37,8 @@ impl AppOp {
         });
 
         // Preferences popover
-        let preferences_popover_button : gtk::Button = self.ui.builder.get_object("preferences_popover_button").unwrap();
-        let preferences_popover_menu : gtk::PopoverMenu = self.ui.builder.get_object("preferences_popover_menu").unwrap();
+        let preferences_popover_button: gtk::Button = self.ui.builder.get_object("preferences_popover_button").unwrap();
+        let preferences_popover_menu: gtk::PopoverMenu = self.ui.builder.get_object("preferences_popover_menu").unwrap();
         preferences_popover_button.connect_clicked(move |_| {
             preferences_popover_menu.show();
         });
@@ -52,6 +52,7 @@ impl AppOp {
             .expect("Couldn't find subreddit_headerbar in ui file.");
 
         subreddit_headerbar.set_subtitle(Some(subreddit_name));
+        subreddit_headerbar.show_all();
 
         subreddit_headerbar.upcast::<gtk::Widget>()
     }
@@ -71,6 +72,7 @@ impl AppOp {
         }
 
         scroll_window.add(&posts_container);
+        scroll_window.show_all();
 
         scroll_window.upcast::<gtk::Widget>()
     }
