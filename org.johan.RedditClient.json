@@ -18,7 +18,7 @@
             "--share=network"
         ],
         "env" : {
-            "CARGO_HOME" : "/run/build/Fractal/cargo",
+            "CARGO_HOME" : "/run/build/RedditGtkClient/cargo",
             "RUST_BACKTRACE" : "1"
         }
     },
